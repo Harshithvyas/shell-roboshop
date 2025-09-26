@@ -8,7 +8,7 @@ N="\e[0m"
 
 LOGS_FOLDER="/var/log/shell-roboshop"
 SCRIPT_NAME=$(echo $0 | cut -d "." -f1)
-LOG_FILE=$LOGS_FOLDER/$SCRIPT_NAME.log"
+LOG_FILE="$LOGS_FOLDER/$SCRIPT_NAME.log"
 
 mkdir -p $LOGS_FOLDER
 echo "Script started executed at: $(date)" &>>$LOG_FILE
@@ -18,26 +18,23 @@ if [ $USERID -ne 0 ]; then
     exit 1 # failure is other than 0
 fi
 
-VALIDATE(){
+VALIDATE() {
   if [ $1 -eq 0 ]; then
-    echo -e " $2 ... $G SUCCESS $N" | $LOS_FILE
-    exit 1
+    echo -e " $2 ... $G SUCCESS $N" | tee -a $LOG_FILE
   else
-    echo -e " $2 ... $R FAILURE $N"
-    
+    echo -e " $2 ... $R FAILURE $N" | tee -a $LOG_FILE
+    exit 1
   fi
 }
 
 cp mongo.repo /etc/yum.repos.d/mongo.repo
 VALIDATE $? "Adding Mongo.repo"
 
-dnf install mongodb-org -y &>>$LOG_FILE
-VALIDATE $? "Installing Mongodb"
+dnf install -y mongodb-org &>>$LOG_FILE
+VALIDATE $? "Installing MongoDB"
 
 systemctl enable mongod &>>$LOG_FILE
 VALIDATE $? "Enable MongoDB"
 
-systemctl start mongod
-VALIDATE $? "Enable MongoDB"
-
- 
+systemctl start mongod &>>$LOG_FILE
+VALIDATE $? "Start MongoDB"
