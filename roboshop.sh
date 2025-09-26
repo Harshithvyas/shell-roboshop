@@ -7,21 +7,30 @@ DOMAIN_NAME="harshithdaws-86s.fun"
 
 for instance in "$@"
 do
-    echo "🚀 Launching $instance instance..."
+    echo "➡️ Processing $instance ..."
 
-    # Run EC2 instance
-    Instance_ID=$(aws ec2 run-instances \
-        --image-id $AMI_ID \
-        --instance-type t3.micro \
-        --security-group-ids $SG_ID \
-        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$instance}]" \
-        --query 'Instances[0].InstanceId' \
+    # Check if instance already exists
+    Instance_ID=$(aws ec2 describe-instances \
+        --filters "Name=tag:Name,Values=$instance" "Name=instance-state-name,Values=running" \
+        --query 'Reservations[0].Instances[0].InstanceId' \
         --output text)
 
-    # Wait until instance is running
-    aws ec2 wait instance-running --instance-ids $Instance_ID
+    if [ "$Instance_ID" == "None" ]; then
+        echo "🚀 Launching new $instance instance..."
+        Instance_ID=$(aws ec2 run-instances \
+            --image-id $AMI_ID \
+            --instance-type t3.micro \
+            --security-group-ids $SG_ID \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$instance}]" \
+            --query 'Instances[0].InstanceId' \
+            --output text)
 
-    # Get IP address
+        aws ec2 wait instance-running --instance-ids $Instance_ID
+    else
+        echo "♻️ Found existing $instance instance: $Instance_ID"
+    fi
+
+    # Get IP
     if [ "$instance" != "frontend" ]; then
         IP=$(aws ec2 describe-instances \
             --instance-ids $Instance_ID \
@@ -38,7 +47,7 @@ do
 
     echo "$instance ($Instance_ID): $IP"
 
-    # Create/Update DNS record in Route53
+    # Update Route53
     aws route53 change-resource-record-sets \
       --hosted-zone-id $ZONE_ID \
       --change-batch "{
@@ -53,5 +62,6 @@ do
         }]
       }"
 
-    echo "✅ DNS record created: $RECORD_NAME -> $IP"
+    echo "✅ DNS updated: $RECORD_NAME -> $IP"
 done
+
