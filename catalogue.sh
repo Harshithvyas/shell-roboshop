@@ -37,11 +37,17 @@ dnf install nodejs -y &>>$LOG_FILE
 VALIDATE $? "Installing NodeJS 20"
 
 #### System user and app directory ####
-useradd --system --home /app --shell /sbin/nologin --comment "roboshop system user" roboshop &>>$LOG_FILE
-VALIDATE $? "Creating system user"
-
 mkdir -p /app
 VALIDATE $? "Creating app directory"
+
+id roboshop &>>$LOG_FILE
+if [ $? -ne 0 ]; then
+  useradd --system --home /app --shell /sbin/nologin --comment "roboshop system user" roboshop &>>$LOG_FILE
+  VALIDATE $? "Creating system user"
+else
+  echo "roboshop user already exists" &>>$LOG_FILE
+  echo -e " Creating system user ... $G SUCCESS $N"
+fi
 
 #### Download and setup catalogue ####
 curl -o /tmp/catalogue.zip https://roboshop-artifacts.s3.amazonaws.com/catalogue-v3.zip &>>$LOG_FILE
@@ -58,23 +64,9 @@ systemctl daemon-reload
 systemctl enable catalogue &>>$LOG_FILE
 VALIDATE $? "Enable catalogue service"
 
-#### MongoDB setup ####
-tee /etc/yum.repos.d/mongodb-org-7.0.repo <<EOF &>>$LOG_FILE
-[mongodb-org-7.0]
-name=MongoDB Repository
-baseurl=https://repo.mongodb.org/yum/redhat/9/mongodb-org/7.0/x86_64/
-gpgcheck=1
-enabled=1
-gpgkey=https://www.mongodb.org/static/pgp/server-7.0.asc
-EOF
-VALIDATE $? "Add MongoDB 7 repo"
-
-dnf install -y mongodb-org &>>$LOG_FILE
-VALIDATE $? "Install MongoDB 7"
-
-systemctl enable mongod &>>$LOG_FILE
-systemctl start mongod &>>$LOG_FILE
-VALIDATE $? "Start MongoDB service"
+#### MongoDB client setup ####
+dnf install -y mongodb-mongosh &>>$LOG_FILE
+VALIDATE $? "Install MongoDB client"
 
 #### Load catalogue data ####
 mongosh --host $MONGODB_HOST </app/db/master-data.js &>>$LOG_FILE
